@@ -1,7 +1,5 @@
 # Chapter ০৬: Monolithic বনাম Microservices
 
-# Monolithic বনাম Microservices Architecture
-
 একটি software application কীভাবে design, develop, deploy এবং scale করা হয়, তার অন্যতম গুরুত্বপূর্ণ সিদ্ধান্ত হলো Architecture নির্বাচন করা।
 
 সাধারণত software development-এ বহুল ব্যবহৃত দুটি architecture হলো:
