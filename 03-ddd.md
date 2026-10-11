@@ -1,227 +1,427 @@
-# Domain-Driven Design (DDD) — সহজ বাংলায়
+# Domain-Driven Design (DDD) with C# — সহজ বাংলায়
 
-## 📌 Domain-Driven Design (DDD) কী?
+Domain-Driven Design (DDD) হলো এমন একটি software design approach, যেখানে business requirements এবং business rules-এর ওপর ভিত্তি করে software-এর Domain Model তৈরি করা হয়।
 
-**Domain-Driven Design (DDD)** হলো একটি software design approach, যেখানে software-এর structure এবং business logic তৈরি করা হয় business requirements ও business rules-এর ওপর ভিত্তি করে।
+এই README-তে ASP.NET Core Web API এবং C# ব্যবহার করে একটি Bus Booking System-এর উদাহরণের মাধ্যমে DDD-এর গুরুত্বপূর্ণ concepts ব্যাখ্যা করা হয়েছে।
 
-সহজভাবে বললে, software তৈরি করার আগে business কীভাবে কাজ করে, কী কী নিয়ম আছে এবং কোন সমস্যাগুলো সমাধান করতে হবে—সেগুলো ভালোভাবে বুঝে সেই অনুযায়ী application design করাই DDD-এর মূল উদ্দেশ্য।
-
-## 🎯 DDD কেন ব্যবহার করা হয়?
-
-একটি বড় software application-এ অনেক business rules, validation এবং complex operations থাকে। সব logic Controller বা Service-এর মধ্যে রাখলে application maintain করা কঠিন হয়ে যায়।
-
-DDD ব্যবহার করলে:
-
-- Business logic সুন্দরভাবে organize করা যায়।
-- Code maintain ও test করা সহজ হয়।
-- Business rules একটি নির্দিষ্ট জায়গায় রাখা যায়।
-- Application-এর complexity নিয়ন্ত্রণ করা যায়।
-- Developer এবং business team একই terminology ব্যবহার করতে পারে।
-- নতুন features যোগ করা এবং existing code পরিবর্তন করা সহজ হয়।
-
-## 🚌 বাস্তব উদাহরণ: Bus Booking System
+## 📌 ১. Domain-Driven Design (DDD) কী?
 
 ধরুন, আমরা একটি Bus Booking System তৈরি করছি।
 
-এখানে কিছু গুরুত্বপূর্ণ business rules রয়েছে:
+আমাদের business requirements:
 
-- একই seat একই সময়ে একাধিক customer বুক করতে পারবে না।
-- Payment সম্পন্ন না হলে booking Confirmed করা যাবে না।
-- Booking cancel হলে নির্দিষ্ট নিয়ম অনুযায়ী seat পুনরায় Available হতে পারে।
-- Expired seat lock নির্দিষ্ট সময় পরে release করতে হবে।
+- Customer একটি bus-এর seat বুক করতে পারবে।
+- একই seat একাধিক customer বুক করতে পারবে না।
+- Payment সম্পন্ন না হলে booking Confirmed হবে না।
+- Booking cancel হলে business rules অনুযায়ী seat আবার Available হবে।
 
-DDD ব্যবহার করে এই business rules-গুলোকে application-এর Domain Model-এর মধ্যে সঠিকভাবে design ও enforce করা যায়।
+এই নিয়মগুলোই আমাদের application-এর **Business Rules**।
 
-## 🧩 DDD-এর গুরুত্বপূর্ণ Concepts
+DDD-এর উদ্দেশ্য হলো business rules-গুলোকে সঠিকভাবে model করা এবং code-এর মধ্যে enforce করা।
 
-### 1. Domain
+## 🏗️ ২. Project Structure
 
-Domain হলো সেই business area, যার সমস্যা সমাধানের জন্য software তৈরি করা হয়।
-
-উদাহরণ:
-- Bus Booking System
-- Pharmacy Management System
-- Banking System
-- E-commerce System
-
-### 2. Entity
-
-Entity হলো এমন একটি object, যার নিজস্ব identity থাকে এবং সময়ের সঙ্গে তার state পরিবর্তন হতে পারে।
-
-উদাহরণ: `Booking`, `Customer`, `Bus`
-
-একটি Booking-এর `Id = 101` থাকলে তার status পরিবর্তন হলেও Booking-টির identity একই থাকে।
-
-### 3. Value Object
-
-Value Object এমন একটি object, যা আলাদা identity-এর পরিবর্তে তার value দিয়ে চিহ্নিত হয়।
-
-উদাহরণ:
-- `Money`
-- `Address`
-- `DateRange`
-
-সঠিকভাবে design করা Value Object সাধারণত immutable হয়।
-
-### 4. Aggregate
-
-Aggregate হলো related domain objects-এর একটি group, যাদের consistency ও business rules একটি নির্দিষ্ট boundary-এর মধ্যে নিয়ন্ত্রণ করা হয়।
-
-Aggregate-এর বাইরের code সাধারণত Aggregate Root-এর মাধ্যমে সেই group-এর state পরিবর্তন করে।
-
-উদাহরণ: `Booking` একটি Aggregate Root হতে পারে, যা booking-এর status ও সংশ্লিষ্ট business rules নিয়ন্ত্রণ করে।
-
-### 5. Repository
-
-Repository হলো Domain Model-এর জন্য persistence access-এর abstraction।
-
-এটি database থেকে Entity load করা এবং পরিবর্তিত state সংরক্ষণ করার কাজকে application-এর business logic থেকে আলাদা রাখতে সাহায্য করে।
-
-উদাহরণ: `IBookingRepository`
-
-### 6. Domain Service
-
-কিছু business operation একটি Entity বা Value Object-এর মধ্যে স্বাভাবিকভাবে রাখা যায় না। সেসব operation-এর জন্য Domain Service ব্যবহার করা যেতে পারে।
-
-### 7. Domain Event
-
-Domain Event হলো Domain-এর মধ্যে ঘটে যাওয়া একটি গুরুত্বপূর্ণ business ঘটনা।
-
-উদাহরণ:
-- `BookingConfirmed`
-- `BookingCancelled`
-- `PaymentCompleted`
-
-Domain Event-এর মাধ্যমে সংশ্লিষ্ট business process-গুলোকে decouple করা যায়।
-
-### 8. Ubiquitous Language
-
-Developer, business analyst এবং domain expert যেন একই business terminology ব্যবহার করেন, সেটিই Ubiquitous Language-এর মূল ধারণা।
-
-উদাহরণ: `Booking`, `Seat Lock`, `Payment`, `Cancellation`।
-
-## 🏗️ ASP.NET Core-এ DDD Project Structure
-
-ASP.NET Core Web API-তে DDD-এর সঙ্গে Clean Architecture ব্যবহার করলে একটি সম্ভাব্য solution structure হতে পারে:
+ASP.NET Core solution-এর একটি সম্ভাব্য structure:
 
 ```text
 BPS.sln
 │
 ├── BPS.Domain
 │   ├── Entities
-│   ├── ValueObjects
-│   ├── Aggregates
-│   ├── DomainServices
-│   └── DomainEvents
+│   │   └── Booking.cs
+│   └── ValueObjects
 │
 ├── BPS.Application
-│   ├── Features
-│   ├── DTOs
-│   ├── Interfaces
 │   └── UseCases
+│       └── ConfirmBooking.cs
 │
 ├── BPS.Infrastructure
-│   ├── Persistence
-│   ├── Repositories
-│   └── Database
+│   └── Repositories
+│       └── BookingRepository.cs
 │
 └── BPS.API
-    ├── Controllers
-    ├── Middleware
-    └── Configuration
+    └── Controllers
+        └── BookingController.cs
 ```
 
-### Project-গুলোর দায়িত্ব
+প্রতিটি layer-এর দায়িত্ব:
 
-| Project | দায়িত্ব |
+| Layer | কাজ |
 |---|---|
-| `BPS.Domain` | Entities, Value Objects ও Business Rules |
-| `BPS.Application` | Use Cases, DTOs ও Application Interfaces |
-| `BPS.Infrastructure` | Database, ADO.NET ও Repository Implementations |
-| `BPS.API` | HTTP Requests, Controllers ও API Configuration |
+| Domain | Business rules এবং domain model |
+| Application | Business use case পরিচালনা |
+| Infrastructure | Database ও external services |
+| API | HTTP request এবং response |
 
-**Dependency Rule:** Domain Layer যতটা সম্ভব independent থাকবে। Infrastructure Layer-এর implementation details সরাসরি Domain Layer-এর ওপর নির্ভরশীল হবে না।
+এটি DDD-এর সঙ্গে Clean Architecture ব্যবহার করার একটি উদাহরণ। DDD নিজে এই নির্দিষ্ট folder structure বাধ্যতামূলক করে না।
 
-এই structure DDD-এর একমাত্র বাধ্যতামূলক structure নয়। Project-এর complexity অনুযায়ী structure পরিবর্তন করা যায়।
+## 🧩 ৩. Entity কী? — বাস্তব উদাহরণ
 
-## 🔄 Booking Confirmation-এর উদাহরণ
+Entity হলো এমন একটি object, যার নিজস্ব identity থাকে।
 
-একটি booking confirm করার সময় সাধারণ flow হতে পারে:
+উদাহরণ: `Booking`।
+
+একটি booking-এর ID `101`। Booking-এর status পরিবর্তন হলেও তার ID একই থাকে।
+
+**File: `BPS.Domain/Entities/Booking.cs`**
+
+```csharp
+namespace BPS.Domain.Entities;
+
+public class Booking
+{
+    public int Id { get; private set; }
+
+    public string Status { get; private set; } = "Pending";
+
+    private Booking()
+    {
+    }
+
+    public Booking(int id)
+    {
+        Id = id;
+    }
+
+    public void Confirm(bool paymentCompleted)
+    {
+        if (!paymentCompleted)
+        {
+            throw new InvalidOperationException(
+                "Payment is not completed.");
+        }
+
+        if (Status != "Pending")
+        {
+            throw new InvalidOperationException(
+                "Only pending bookings can be confirmed.");
+        }
+
+        Status = "Confirmed";
+    }
+
+    public void Cancel()
+    {
+        if (Status != "Pending" && Status != "Confirmed")
+        {
+            throw new InvalidOperationException(
+                "Booking cannot be cancelled.");
+        }
+
+        Status = "Cancelled";
+    }
+}
+```
+
+### এখানে কী হচ্ছে?
+
+- `Id` হলো Entity-এর identity।
+- `private set` বাইরের code থেকে সরাসরি status পরিবর্তন সীমিত করে।
+- `Confirm()` payment এবং booking status যাচাই করে।
+- `Cancel()` শুধু নির্ধারিত status থেকে cancellation অনুমোদন করে।
+
+**DDD-এর মূল শিক্ষা:** Business rules-কে শুধু Controller-এর মধ্যে না রেখে Domain Model-এর মধ্যে enforce করা।
+
+এই উদাহরণে status string ব্যবহার করা হয়েছে সহজভাবে বোঝানোর জন্য। Production code-এ enum বা আরও শক্তিশালী domain types ব্যবহার করা যেতে পারে।
+
+## 🧪 ৪. Entity-কে ব্যবহার করে দেখা
+
+**Example: `Program.cs` অথবা একটি Console Test**
+
+```csharp
+using BPS.Domain.Entities;
+
+var booking = new Booking(101);
+
+Console.WriteLine(booking.Status);
+// Output: Pending
+
+booking.Confirm(paymentCompleted: true);
+
+Console.WriteLine(booking.Status);
+// Output: Confirmed
+```
+
+Payment সম্পন্ন না হলে:
+
+```csharp
+var booking = new Booking(102);
+
+booking.Confirm(paymentCompleted: false);
+```
+
+Expected result:
 
 ```text
-Angular Frontend
-       |
-       v
-ASP.NET Core API
-       |
-       v
-Application Layer
-       |
-       v
-Domain Model
-       |
-       v
-Infrastructure Layer
-       |
-       v
-SQL Server
+System.InvalidOperationException:
+Payment is not completed.
 ```
 
-এই flow-তে:
+এখানে booking-এর status পরিবর্তন হওয়ার আগে Domain Model business rule যাচাই করেছে।
 
-1. API booking confirmation request গ্রহণ করে।
-2. Application Layer confirmation use case পরিচালনা করে।
-3. Domain Model business rules যাচাই করে।
-4. Infrastructure Layer database operation সম্পন্ন করে।
-5. সফল হলে API response ফেরত দেয়।
+## 💎 ৫. Value Object কী?
 
-বাস্তব booking system-এ payment verification, seat locking, concurrency control এবং database transaction-ও সঠিকভাবে পরিচালনা করতে হবে।
+Value Object হলো এমন একটি object, যার পরিচয় আলাদা ID দিয়ে নয়; তার value দিয়ে নির্ধারিত হয়।
 
-## ⚖️ DDD কখন ব্যবহার করা উচিত?
+উদাহরণ: `Money`।
 
-**DDD উপযোগী হতে পারে যখন:**
-- Business rules জটিল।
-- একাধিক business workflow রয়েছে।
-- Application দীর্ঘমেয়াদে maintain করতে হবে।
-- Business logic সঠিকভাবে test করা প্রয়োজন।
-- একাধিক team একই domain নিয়ে কাজ করে।
+**File: `BPS.Domain/ValueObjects/Money.cs`**
 
-**DDD সব project-এর জন্য প্রয়োজনীয় নয়।**
+```csharp
+namespace BPS.Domain.ValueObjects;
 
-সাধারণ CRUD application বা ছোট project-এর ক্ষেত্রে একটি সহজ layered architecture যথেষ্ট হতে পারে। অপ্রয়োজনীয় abstraction তৈরি করলে DDD application-কে আরও জটিল করে তুলতে পারে।
+public sealed record Money(decimal Amount, string Currency)
+{
+    public Money
+    {
+        if (Amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(Amount));
+        }
 
-## 🛠️ DDD-এর সঙ্গে যেসব Technology ব্যবহার করা যায়
+        if (string.IsNullOrWhiteSpace(Currency))
+        {
+            throw new ArgumentException(
+                "Currency is required.");
+        }
+    }
+}
+```
 
-- C#
-- ASP.NET Core Web API
-- Entity Framework Core
-- ADO.NET
-- SQL Server
-- Clean Architecture
-- CQRS
-- Domain Events
-- Unit Testing
+উপরের compact constructor syntax সাধারণ C# class-এর জন্য বৈধ নয়। পরিবর্তে নিচের compile-ready implementation ব্যবহার করুন:
 
-এগুলো DDD-এর বাধ্যতামূলক অংশ নয়; project-এর প্রয়োজন অনুযায়ী ব্যবহার করা হয়।
+```csharp
+namespace BPS.Domain.ValueObjects;
 
-## 📚 শেখার Roadmap
+public sealed record Money
+{
+    public decimal Amount { get; }
+    public string Currency { get; }
 
-1. Domain এবং Business Rules বুঝুন।
-2. Entity ও Value Object তৈরি করা শিখুন।
-3. Aggregate এবং Aggregate Root বুঝুন।
-4. Repository Pattern ও Domain Service শিখুন।
-5. ASP.NET Core-এ Domain Model implement করুন।
-6. Clean Architecture-এর সঙ্গে DDD ব্যবহার করুন।
-7. Unit Testing ও Integration Testing করুন।
-8. প্রয়োজন অনুযায়ী CQRS এবং Domain Events যুক্ত করুন।
+    public Money(decimal amount, string currency)
+    {
+        if (amount < 0)
+            throw new ArgumentOutOfRangeException(nameof(amount));
+
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new ArgumentException(
+                "Currency is required.", nameof(currency));
+
+        Amount = amount;
+        Currency = currency;
+    }
+}
+```
+
+ব্যবহার:
+
+```csharp
+var ticketPrice = new Money(500, "BDT");
+var anotherPrice = new Money(500, "BDT");
+
+Console.WriteLine(ticketPrice == anotherPrice);
+// Output: True
+```
+
+দুটি `Money` object-এর value একই, তাই record value equality ব্যবহার করে তাদের সমান হিসেবে তুলনা করে।
+
+## 📦 ৬. Repository Pattern কী?
+
+Repository হলো Domain Model-এর data load এবং save করার abstraction।
+
+Domain-এ interface রাখা যায়:
+
+**File: `BPS.Domain/Repositories/IBookingRepository.cs`**
+
+```csharp
+using BPS.Domain.Entities;
+
+namespace BPS.Domain.Repositories;
+
+public interface IBookingRepository
+{
+    Task<Booking?> GetByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+
+    Task SaveAsync(
+        Booking booking,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Infrastructure project-এ এই interface-এর implementation থাকবে। সেখানে ADO.NET, Entity Framework Core বা অন্য persistence technology ব্যবহার করা যেতে পারে।
+
+Repository interface থাকার কারণে business logic-কে সরাসরি SQL query লিখতে হয় না।
+
+## ⚙️ ৭. Application Layer-এ Use Case
+
+Application Layer নির্দিষ্ট business operation পরিচালনা করে।
+
+**File: `BPS.Application/UseCases/ConfirmBooking.cs`**
+
+```csharp
+using BPS.Domain.Repositories;
+
+namespace BPS.Application.UseCases;
+
+public sealed class ConfirmBooking
+{
+    private readonly IBookingRepository _repository;
+
+    public ConfirmBooking(IBookingRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task ExecuteAsync(
+        int bookingId,
+        bool paymentCompleted,
+        CancellationToken cancellationToken = default)
+    {
+        var booking = await _repository.GetByIdAsync(
+            bookingId, cancellationToken);
+
+        if (booking is null)
+        {
+            throw new InvalidOperationException(
+                "Booking not found.");
+        }
+
+        booking.Confirm(paymentCompleted);
+
+        await _repository.SaveAsync(
+            booking, cancellationToken);
+    }
+}
+```
+
+এখানে:
+
+1. Repository থেকে booking load করা হচ্ছে।
+2. Booking না থাকলে error দেওয়া হচ্ছে।
+3. Domain Entity-এর `Confirm()` method business rules যাচাই করছে।
+4. সফল হলে Repository দিয়ে পরিবর্তন save করা হচ্ছে।
+
+এই code-এ payment status একটি Boolean হিসেবে দেওয়া হয়েছে শুধু উদাহরণের জন্য। Production system-এ payment-এর সত্যতা server-side payment record বা trusted payment service থেকে যাচাই করতে হবে।
+
+## 🌐 ৮. API Controller কীভাবে কাজ করবে?
+
+Controller HTTP request গ্রহণ করে Application Layer-এর use case চালাবে।
+
+```csharp
+[ApiController]
+[Route("api/bookings")]
+public class BookingController : ControllerBase
+{
+    private readonly ConfirmBooking _confirmBooking;
+
+    public BookingController(ConfirmBooking confirmBooking)
+    {
+        _confirmBooking = confirmBooking;
+    }
+
+    [HttpPost("{id:int}/confirm")]
+    public async Task<IActionResult> Confirm(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        await _confirmBooking.ExecuteAsync(
+            id,
+            paymentCompleted: true,
+            cancellationToken);
+
+        return Ok(new
+        {
+            Message = "Booking confirmed successfully."
+        });
+    }
+}
+```
+
+উদাহরণ request:
+
+```http
+POST /api/bookings/101/confirm
+```
+
+সফল response:
+
+```json
+{
+  "message": "Booking confirmed successfully."
+}
+```
+
+এটি flow বোঝানোর উদাহরণ। Production API-তে authentication, authorization, trusted payment verification এবং exception-to-HTTP mapping যুক্ত করতে হবে। Controller থেকে `paymentCompleted: true` সরাসরি দেওয়া নিরাপদ নয়।
+
+## 🔄 ৯. Aggregate ও Aggregate Root
+
+Aggregate হলো related domain objects-এর consistency boundary। Aggregate Root হলো সেই boundary-এর প্রধান Entity, যার মাধ্যমে বাইরের code state পরিবর্তন করে।
+
+উদাহরণ:
+
+```text
+Booking (Aggregate Root)
+   |
+   ├── BookingId
+   ├── CustomerId
+   ├── BookingStatus
+   └── TicketPrice (Money)
+```
+
+যদি `Booking` Aggregate Root হয়, তাহলে বাইরের code সরাসরি তার internal state পরিবর্তন না করে `Confirm()` বা `Cancel()`-এর মতো method ব্যবহার করবে।
+
+**গুরুত্বপূর্ণ:** একটি seat একই সময়ে একাধিক customer-এর কাছে বিক্রি হওয়া ঠেকাতে শুধু Domain Entity যথেষ্ট নয়। Database transaction, concurrency control এবং atomic seat-lock operation-ও প্রয়োজন।
+
+## 📢 ১০. Domain Event কী?
+
+Domain Event হলো Domain-এ ঘটে যাওয়া গুরুত্বপূর্ণ business ঘটনা।
+
+উদাহরণ: `BookingConfirmed`।
+
+```csharp
+public sealed record BookingConfirmed(
+    int BookingId,
+    DateTime ConfirmedAtUtc);
+```
+
+Booking confirm হওয়ার পর এই event প্রকাশ করা যেতে পারে। অন্য component event-টি ব্যবহার করে ticket notification বা অন্যান্য workflow চালাতে পারে।
+
+Event publishing এবং database save-এর মধ্যে consistency নিশ্চিত করতে production system-এ Outbox Pattern-এর মতো পদ্ধতি প্রয়োজন হতে পারে।
+
+## 🆚 ১১. সাধারণ CRUD বনাম DDD
+
+| সাধারণ CRUD | DDD |
+|---|---|
+| মূলত data create, read, update, delete করে | Business rules ও domain behavior-কে গুরুত্ব দেয় |
+| Logic Controller বা Service-এ কেন্দ্রীভূত হতে পারে | Domain behavior Entity বা Domain Service-এ model করা হয় |
+| সাধারণ application-এর জন্য সহজ | Complex business domain-এর জন্য কার্যকর |
+| কম abstraction প্রয়োজন হতে পারে | প্রয়োজন অনুযায়ী অতিরিক্ত abstraction থাকতে পারে |
+
+সব application-এ DDD ব্যবহার করা প্রয়োজন নেই। ছোট CRUD application-এর জন্য simple layered architecture যথেষ্ট হতে পারে।
+
+## 🗺️ ১২. DDD শেখার Roadmap
+
+1. Domain ও Business Rules
+2. Entity ও Value Object
+3. Aggregate ও Aggregate Root
+4. Repository Pattern
+5. Domain Service ও Domain Event
+6. ASP.NET Core Application Layer
+7. Clean Architecture
+8. Unit Testing ও Integration Testing
+9. প্রয়োজন অনুযায়ী CQRS ও Outbox Pattern
 
 ## ✅ Conclusion
 
-Domain-Driven Design-এর মূল লক্ষ্য শুধু code-কে বিভিন্ন project বা folder-এ ভাগ করা নয়। এর উদ্দেশ্য হলো business requirements এবং rules-কে সঠিকভাবে model করা, business logic-কে পরিষ্কার রাখা এবং complex software-কে maintainable ও testable করা।
+Domain-Driven Design-এর মূল উদ্দেশ্য শুধু project-কে বিভিন্ন folder-এ ভাগ করা নয়। বরং business requirements বুঝে এমন Domain Model তৈরি করা, যা business rules enforce করে এবং complex application-কে maintainable ও testable রাখে।
 
-**Remember:** Good software design starts with understanding the business, not just writing code.
+**Remember:** Understand the business first, model the domain, and then write the code.
 
----
+**Technologies:** C#, ASP.NET Core Web API, SQL Server, ADO.NET, Clean Architecture, Unit Testing.
+
 
 **Author:** Joni Miah  
 **Topic:** Software Architecture | Domain-Driven Design | ASP.NET Core
