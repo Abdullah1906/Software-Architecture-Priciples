@@ -1,5 +1,4 @@
 # Chapter ১০: Database Sharding ও Partitioning
-# 🗄️ Database Sharding ও Partitioning — Complete Guide
 
 &gt; এই ডকুমেন্টে Database **Partitioning** এবং **Sharding** কী, কেন দরকার, এবং Production/Professional level-এ কীভাবে ব্যবহার হয় — সবকিছু step-by-step, example সহ বাংলায় ব্যাখ্যা করা হয়েছে।
 
@@ -612,16 +611,6 @@ Consistent Hashing Ring:
 
 ---
 
-## 📚 References
-
-- [PostgreSQL Table Partitioning Docs](https://www.postgresql.org/docs/current/ddl-partitioning.html)
-- [MongoDB Sharding Docs](https://www.mongodb.com/docs/sharding/)
-- [Vitess Documentation](https://vitess.io/docs/)
-- [Citus (PostgreSQL Extension)](https://www.citusdata.com/)
-- Designing Data-Intensive Applications — Martin Kleppmann
-- High Scalability Blog (sharding war stories)
-
----
 
 **⭐ যদি এই গাইড কাজে লাগে, repository-তে একটা star দেবেন!**
 
