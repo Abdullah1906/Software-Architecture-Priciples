@@ -146,12 +146,6 @@ CREATE TABLE Orders (
 ) ON OrderDateRangePS(CreatedAt); -- Partition Scheme-এর সাথে যুক্ত করা হলো
 ```
 
-**Query:**
-```sql
--- PostgreSQL নিজেই বুঝে নেবে কোন partition-এ খুঁজবে (Partition Pruning)
-SELECT * FROM orders
-WHERE created_at &gt;= '2026-01-01' AND created_at &lt; '2026-02-01';
-```
 
 ### 2️⃣ Vertical Partitioning
 **Column** অনুযায়ী টেবিল ভাগ করা। বড়/কম ব্যবহৃত column আলাদা টেবিলে।
