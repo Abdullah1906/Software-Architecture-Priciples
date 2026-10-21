@@ -107,29 +107,43 @@ orders_2026
 ## 🔹 Partitioning-এর প্রকারভেদ ও ব্যবহার
 
 ### 1️⃣ Horizontal Partitioning (Range Partitioning)
-Row গুলোকে কোনো column-এর **range** অনুযায়ী ভাগ করা।
+একটি বিশাল টেবিলের সবগুলো Column একই থাকবে, কিন্তু Row (ডাটা) গুলোকে কোনো নির্দিষ্ট Column (যেমন: Date, Year, ID)-এর Range বা ব্যাপ্তি অনুসারে ছোট ছোট অংশে ভাগ করে রাখা হয়।
 
-**Example — PostgreSQL:**
+*cকেন ব্যবহার করবেন? ধরুন আপনার Orders টেবিলে ۱۰ বছরের ডাটা আছে (১০ কোটি Row)। আপনি যদি ২০২৬ সালের ডাটা সার্চ করেন, SQL Server পুরো ১০ কোটি Row না খুঁজে শুধু ২০২৬ সালের নির্দিষ্ট Partition-এ খুঁজবে। একে Partition Pruning বলা হয়, যা Query Performance অনেক বাড়িয়ে দেয়।
+
+SSMS (SQL Server)-এ কীভাবে করবেন?
+SQL Server-এ Range Partitioning করতে ৩টি ধাপ অনুসরণ করতে হয়:
+
+1. Partition Function: Range নির্ধারণ করে (কোথায় ভাগ হবে)।
+
+2. Partition Scheme: Partition গুলোকে Storage/Filegroup-এ ম্যাপ করে।
+
+3. Partitioned Table: মূল টেবিল তৈরি করা।
+
+**Example — SSMS:**
 
 ```sql
--- Main partitioned table
-CREATE TABLE orders (
-    id          BIGSERIAL,
-    user_id     INT NOT NULL,
-    amount      NUMERIC(10,2),
-    created_at  DATE NOT NULL,
-    status      VARCHAR(20)
-) PARTITION BY RANGE (created_at);
+-- ১. Partition Function তৈরি (Date Range অনুযায়ী)
+CREATE PARTITION FUNCTION OrderDateRangePF (DATETIME)
+AS RANGE RIGHT FOR VALUES (
+    '2024-01-01', 
+    '2025-01-01', 
+    '2026-01-01'
+);
 
--- Individual partitions
-CREATE TABLE orders_2024 PARTITION OF orders
-    FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+-- ২. Partition Scheme তৈরি
+CREATE PARTITION SCHEME OrderDateRangePS
+AS PARTITION OrderDateRangePF
+ALL TO ([PRIMARY]); -- সব ডাটা Primary Filegroup-এ থাকবে
 
-CREATE TABLE orders_2025 PARTITION OF orders
-    FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
-
-CREATE TABLE orders_2026 PARTITION OF orders
-    FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+-- ৩. Partitioned Table তৈরি
+CREATE TABLE Orders (
+    OrderId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Amount DECIMAL(10,2),
+    CreatedAt DATETIME NOT NULL,
+    Status VARCHAR(20)
+) ON OrderDateRangePS(CreatedAt); -- Partition Scheme-এর সাথে যুক্ত করা হলো
 ```
 
 **Query:**
@@ -145,51 +159,88 @@ WHERE created_at &gt;= '2026-01-01' AND created_at &lt; '2026-02-01';
 **Example:** `users` টেবিলে `profile_picture_blob` (৫ MB) সবসময় লাগে না → আলাদা `user_media` টেবিলে।
 
 ```sql
--- users (frequently accessed)
-CREATE TABLE users (
-    id        BIGSERIAL PRIMARY KEY,
-    username  VARCHAR(50),
-    email     VARCHAR(100),
-    password  VARCHAR(255)
+-- ১. Frequently Accessed Data (Main Table)
+CREATE TABLE Users (
+    UserId INT IDENTITY(1,1) PRIMARY KEY,
+    Username VARCHAR(50) NOT NULL,
+    Email VARCHAR(100) NOT NULL,
+    PasswordHash VARCHAR(255) NOT NULL
 );
 
--- user_media (rarely accessed)
-CREATE TABLE user_media (
-    user_id     BIGINT PRIMARY KEY REFERENCES users(id),
-    avatar_blob BYTEA,
-    bio         TEXT
+-- ۲. Rarely Accessed Large Data (Separate Table)
+CREATE TABLE UserMedia (
+    UserId INT PRIMARY KEY,
+    AvatarBlob VARBINARY(MAX), -- বড় বাইনারি ডাটা
+    Bio NVARCHAR(MAX),
+    CONSTRAINT FK_UserMedia_Users FOREIGN KEY (UserId) REFERENCES Users(UserId)
 );
+```
+
+ব্যবহার করার নিয়ম:
+
+* সাধারণ Login বা User List দেখানোর সময় শুধু Users টেবিল Query করবেন (SELECT Username, Email FROM Users).
+
+* যখন User Profile Detail দেখাবেন, তখন JOIN করে ডাটা আনবেন:
+```bash
+SELECT u.Username, u.Email, m.Bio 
+FROM Users u
+LEFT JOIN UserMedia m ON u.UserId = m.UserId
+WHERE u.UserId = 10;
 ```
 
 ### 3️⃣ List Partitioning
-নির্দিষ্ট value-এর list অনুযায়ী ভাগ।
+ডাটাকে নির্দিষ্ট কিছু মান বা ক্যাটাগরি (Discrete Values/List) অনুযায়ী ভাগ করা (যেমন: Division, Country, Status)।
+
+* বিশেষ দ্রষ্টব্য: SQL Server (SSMS)-এ সরাসরি PARTITION BY LIST নামের কোনো বিল্ট-ইন ফিউচার নেই (যা PostgreSQL বা Oracle-এ আছে)। তবে SSMS-এ এটি Partition Function এবং CHECK Constraint দিয়ে অর্জন করা হয়।
 
 ```sql
-CREATE TABLE orders (
-    id         BIGSERIAL,
-    region     VARCHAR(20),
-    amount     NUMERIC(10,2)
-) PARTITION BY LIST (region);
+-- Partition Function দিয়ে Discrete values হ্যান্ডেল করা
+CREATE PARTITION FUNCTION RegionListPF (VARCHAR(20))
+AS RANGE LEFT FOR VALUES ('CHATTOGRAM', 'DHAKA', 'KHULNA');
 
-CREATE TABLE orders_dhaka PARTITION OF orders FOR VALUES IN ('DHAKA');
-CREATE TABLE orders_ctg   PARTITION OF orders FOR VALUES IN ('CHATTOGRAM');
-CREATE TABLE orders_khulna PARTITION OF orders FOR VALUES IN ('KHULNA');
+CREATE PARTITION SCHEME RegionListPS
+AS PARTITION RegionListPF
+ALL TO ([PRIMARY]);
+
+CREATE TABLE OrdersByRegion (
+    OrderId INT IDENTITY(1,1),
+    Region VARCHAR(20) NOT NULL,
+    Amount DECIMAL(10,2)
+) ON RegionListPS(Region);
 ```
 
 ### 4️⃣ Hash Partitioning
-Hash function দিয়ে evenly ভাগ করা (Sharding-এর সাথে মিল আছে)।
+ডাটা কোনো তারিখ বা ক্যাটাগরি মেনে চলে না। তাই SQL Server ডাটার ওপর একটি Hash Algorithm প্রয়োগ করে ডাটাগুলোকে সমানভাবে বিভিন্ন Partition-এ ছড়িয়ে দেয় (Even Distribution)।
+
+* কেন ব্যবহার করবেন? যখন ডাটাতে কোনো নির্দিষ্ট Range থাকে না, কিন্তু ডাটার সাইজ এতো বেশি যে তা একাধিক Partition-এ সমানভাবে ভাগ করা প্রয়োজন (High Concurrency এড়াতে)।
+
+* SSMS-এ কীভাবে কাজ করে? SQL Server-এ Hash Partitioning করতে আমরা একটি Computed Column (Hash Value) তৈরি করি এবং তার ওপর Range Partition 적용 করি।
 
 ```sql
-CREATE TABLE sessions (
-    id         BIGSERIAL,
-    user_id    INT NOT NULL,
-    token      VARCHAR(255)
-) PARTITION BY HASH (user_id);
+-- ১. Hash Value বের করার জন্য Computed Column সহ টেবিল তৈরি
+CREATE TABLE UserSessions (
+    SessionId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Token VARCHAR(255),
+    -- UserId-কে ৪টি ಭಾಗ (0, 1, 2, 3)-এ ভাগ করার জন্য Modulo/Hash কলাম
+    HashPartitionKey AS (ABS(UserId) % 4) PERSISTED 
+);
 
-CREATE TABLE sessions_p0 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 0);
-CREATE TABLE sessions_p1 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 1);
-CREATE TABLE sessions_p2 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 2);
-CREATE TABLE sessions_p3 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+-- ۲. Hash Key-এর ওপর Partition Function
+CREATE PARTITION FUNCTION SessionHashPF (INT)
+AS RANGE LEFT FOR VALUES (0, 1, 2);
+
+CREATE PARTITION SCHEME SessionHashPS
+AS PARTITION SessionHashPF
+ALL TO ([PRIMARY]);
+
+-- ৩. Partitioned Table তৈরি
+CREATE TABLE PartitionedSessions (
+    SessionId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Token VARCHAR(255),
+    HashPartitionKey AS (ABS(UserId) % 4) PERSISTED
+) ON SessionHashPS(HashPartitionKey);
 ```
 
 ---
