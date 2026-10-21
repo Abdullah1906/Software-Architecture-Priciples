@@ -1,5 +1,4 @@
 # Chapter ১০: Database Sharding ও Partitioning
-# 🗄️ Database Sharding ও Partitioning — Complete Guide
 
 &gt; এই ডকুমেন্টে Database **Partitioning** এবং **Sharding** কী, কেন দরকার, এবং Production/Professional level-এ কীভাবে ব্যবহার হয় — সবকিছু step-by-step, example সহ বাংলায় ব্যাখ্যা করা হয়েছে।
 
@@ -107,37 +106,45 @@ orders_2026
 ## 🔹 Partitioning-এর প্রকারভেদ ও ব্যবহার
 
 ### 1️⃣ Horizontal Partitioning (Range Partitioning)
-Row গুলোকে কোনো column-এর **range** অনুযায়ী ভাগ করা।
+একটি বিশাল টেবিলের সবগুলো Column একই থাকবে, কিন্তু Row (ডাটা) গুলোকে কোনো নির্দিষ্ট Column (যেমন: Date, Year, ID)-এর Range বা ব্যাপ্তি অনুসারে ছোট ছোট অংশে ভাগ করে রাখা হয়।
 
-**Example — PostgreSQL:**
+*cকেন ব্যবহার করবেন? ধরুন আপনার Orders টেবিলে ۱۰ বছরের ডাটা আছে (১০ কোটি Row)। আপনি যদি ২০২৬ সালের ডাটা সার্চ করেন, SQL Server পুরো ১০ কোটি Row না খুঁজে শুধু ২০২৬ সালের নির্দিষ্ট Partition-এ খুঁজবে। একে Partition Pruning বলা হয়, যা Query Performance অনেক বাড়িয়ে দেয়।
+
+SSMS (SQL Server)-এ কীভাবে করবেন?
+SQL Server-এ Range Partitioning করতে ৩টি ধাপ অনুসরণ করতে হয়:
+
+1. Partition Function: Range নির্ধারণ করে (কোথায় ভাগ হবে)।
+
+2. Partition Scheme: Partition গুলোকে Storage/Filegroup-এ ম্যাপ করে।
+
+3. Partitioned Table: মূল টেবিল তৈরি করা।
+
+**Example — SSMS:**
 
 ```sql
--- Main partitioned table
-CREATE TABLE orders (
-    id          BIGSERIAL,
-    user_id     INT NOT NULL,
-    amount      NUMERIC(10,2),
-    created_at  DATE NOT NULL,
-    status      VARCHAR(20)
-) PARTITION BY RANGE (created_at);
+-- ১. Partition Function তৈরি (Date Range অনুযায়ী)
+CREATE PARTITION FUNCTION OrderDateRangePF (DATETIME)
+AS RANGE RIGHT FOR VALUES (
+    '2024-01-01', 
+    '2025-01-01', 
+    '2026-01-01'
+);
 
--- Individual partitions
-CREATE TABLE orders_2024 PARTITION OF orders
-    FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+-- ২. Partition Scheme তৈরি
+CREATE PARTITION SCHEME OrderDateRangePS
+AS PARTITION OrderDateRangePF
+ALL TO ([PRIMARY]); -- সব ডাটা Primary Filegroup-এ থাকবে
 
-CREATE TABLE orders_2025 PARTITION OF orders
-    FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
-
-CREATE TABLE orders_2026 PARTITION OF orders
-    FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+-- ৩. Partitioned Table তৈরি
+CREATE TABLE Orders (
+    OrderId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Amount DECIMAL(10,2),
+    CreatedAt DATETIME NOT NULL,
+    Status VARCHAR(20)
+) ON OrderDateRangePS(CreatedAt); -- Partition Scheme-এর সাথে যুক্ত করা হলো
 ```
 
-**Query:**
-```sql
--- PostgreSQL নিজেই বুঝে নেবে কোন partition-এ খুঁজবে (Partition Pruning)
-SELECT * FROM orders
-WHERE created_at &gt;= '2026-01-01' AND created_at &lt; '2026-02-01';
-```
 
 ### 2️⃣ Vertical Partitioning
 **Column** অনুযায়ী টেবিল ভাগ করা। বড়/কম ব্যবহৃত column আলাদা টেবিলে।
@@ -145,51 +152,88 @@ WHERE created_at &gt;= '2026-01-01' AND created_at &lt; '2026-02-01';
 **Example:** `users` টেবিলে `profile_picture_blob` (৫ MB) সবসময় লাগে না → আলাদা `user_media` টেবিলে।
 
 ```sql
--- users (frequently accessed)
-CREATE TABLE users (
-    id        BIGSERIAL PRIMARY KEY,
-    username  VARCHAR(50),
-    email     VARCHAR(100),
-    password  VARCHAR(255)
+-- ১. Frequently Accessed Data (Main Table)
+CREATE TABLE Users (
+    UserId INT IDENTITY(1,1) PRIMARY KEY,
+    Username VARCHAR(50) NOT NULL,
+    Email VARCHAR(100) NOT NULL,
+    PasswordHash VARCHAR(255) NOT NULL
 );
 
--- user_media (rarely accessed)
-CREATE TABLE user_media (
-    user_id     BIGINT PRIMARY KEY REFERENCES users(id),
-    avatar_blob BYTEA,
-    bio         TEXT
+-- ۲. Rarely Accessed Large Data (Separate Table)
+CREATE TABLE UserMedia (
+    UserId INT PRIMARY KEY,
+    AvatarBlob VARBINARY(MAX), -- বড় বাইনারি ডাটা
+    Bio NVARCHAR(MAX),
+    CONSTRAINT FK_UserMedia_Users FOREIGN KEY (UserId) REFERENCES Users(UserId)
 );
+```
+
+ব্যবহার করার নিয়ম:
+
+* সাধারণ Login বা User List দেখানোর সময় শুধু Users টেবিল Query করবেন (SELECT Username, Email FROM Users).
+
+* যখন User Profile Detail দেখাবেন, তখন JOIN করে ডাটা আনবেন:
+```bash
+SELECT u.Username, u.Email, m.Bio 
+FROM Users u
+LEFT JOIN UserMedia m ON u.UserId = m.UserId
+WHERE u.UserId = 10;
 ```
 
 ### 3️⃣ List Partitioning
-নির্দিষ্ট value-এর list অনুযায়ী ভাগ।
+ডাটাকে নির্দিষ্ট কিছু মান বা ক্যাটাগরি (Discrete Values/List) অনুযায়ী ভাগ করা (যেমন: Division, Country, Status)।
+
+* বিশেষ দ্রষ্টব্য: SQL Server (SSMS)-এ সরাসরি PARTITION BY LIST নামের কোনো বিল্ট-ইন ফিউচার নেই (যা PostgreSQL বা Oracle-এ আছে)। তবে SSMS-এ এটি Partition Function এবং CHECK Constraint দিয়ে অর্জন করা হয়।
 
 ```sql
-CREATE TABLE orders (
-    id         BIGSERIAL,
-    region     VARCHAR(20),
-    amount     NUMERIC(10,2)
-) PARTITION BY LIST (region);
+-- Partition Function দিয়ে Discrete values হ্যান্ডেল করা
+CREATE PARTITION FUNCTION RegionListPF (VARCHAR(20))
+AS RANGE LEFT FOR VALUES ('CHATTOGRAM', 'DHAKA', 'KHULNA');
 
-CREATE TABLE orders_dhaka PARTITION OF orders FOR VALUES IN ('DHAKA');
-CREATE TABLE orders_ctg   PARTITION OF orders FOR VALUES IN ('CHATTOGRAM');
-CREATE TABLE orders_khulna PARTITION OF orders FOR VALUES IN ('KHULNA');
+CREATE PARTITION SCHEME RegionListPS
+AS PARTITION RegionListPF
+ALL TO ([PRIMARY]);
+
+CREATE TABLE OrdersByRegion (
+    OrderId INT IDENTITY(1,1),
+    Region VARCHAR(20) NOT NULL,
+    Amount DECIMAL(10,2)
+) ON RegionListPS(Region);
 ```
 
 ### 4️⃣ Hash Partitioning
-Hash function দিয়ে evenly ভাগ করা (Sharding-এর সাথে মিল আছে)।
+ডাটা কোনো তারিখ বা ক্যাটাগরি মেনে চলে না। তাই SQL Server ডাটার ওপর একটি Hash Algorithm প্রয়োগ করে ডাটাগুলোকে সমানভাবে বিভিন্ন Partition-এ ছড়িয়ে দেয় (Even Distribution)।
+
+* কেন ব্যবহার করবেন? যখন ডাটাতে কোনো নির্দিষ্ট Range থাকে না, কিন্তু ডাটার সাইজ এতো বেশি যে তা একাধিক Partition-এ সমানভাবে ভাগ করা প্রয়োজন (High Concurrency এড়াতে)।
+
+* SSMS-এ কীভাবে কাজ করে? SQL Server-এ Hash Partitioning করতে আমরা একটি Computed Column (Hash Value) তৈরি করি এবং তার ওপর Range Partition 적용 করি।
 
 ```sql
-CREATE TABLE sessions (
-    id         BIGSERIAL,
-    user_id    INT NOT NULL,
-    token      VARCHAR(255)
-) PARTITION BY HASH (user_id);
+-- ১. Hash Value বের করার জন্য Computed Column সহ টেবিল তৈরি
+CREATE TABLE UserSessions (
+    SessionId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Token VARCHAR(255),
+    -- UserId-কে ৪টি ಭಾಗ (0, 1, 2, 3)-এ ভাগ করার জন্য Modulo/Hash কলাম
+    HashPartitionKey AS (ABS(UserId) % 4) PERSISTED 
+);
 
-CREATE TABLE sessions_p0 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 0);
-CREATE TABLE sessions_p1 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 1);
-CREATE TABLE sessions_p2 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 2);
-CREATE TABLE sessions_p3 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+-- ۲. Hash Key-এর ওপর Partition Function
+CREATE PARTITION FUNCTION SessionHashPF (INT)
+AS RANGE LEFT FOR VALUES (0, 1, 2);
+
+CREATE PARTITION SCHEME SessionHashPS
+AS PARTITION SessionHashPF
+ALL TO ([PRIMARY]);
+
+-- ৩. Partitioned Table তৈরি
+CREATE TABLE PartitionedSessions (
+    SessionId INT IDENTITY(1,1),
+    UserId INT NOT NULL,
+    Token VARCHAR(255),
+    HashPartitionKey AS (ABS(UserId) % 4) PERSISTED
+) ON SessionHashPS(HashPartitionKey);
 ```
 
 ---
@@ -197,7 +241,16 @@ CREATE TABLE sessions_p3 PARTITION OF sessions FOR VALUES WITH (MODULUS 4, REMAI
 ## 🔹 Sharding-এর প্রকারভেদ ও ব্যবহার
 
 ### 1️⃣ Range-Based Sharding
-Key-এর range অনুযায়ী shard নির্বাচন।
+১. Range-Based Sharding
+সহজ ব্যাখ্যা: ডাটার নির্দিষ্ট সীমানা বা Range (যেমন: User ID ১ থেকে ১ কোটি) অনুযায়ী আলাদা আলাদা Server-এ ডাটা রাখা।
+
+* Server 1 (Shard 1): User ID 1 থেকে 10,000,000
+
+* Server 2 (Shard 2): User ID 10,000,001 থেকে 20,000,000
+
+বাস্তব প্রয়োগ: ধরুন আপনার ব্যাংকিং অ্যাপে অ্যাকাউন্ট খোলার বছর বা সিরিয়াল নম্বর দিয়ে ডাটা আলাদা সার্ভারে পাঠাচ্ছেন।
+
+সমস্যা (Hotspot): ধরুন Shard 2-এর ইউজাররা (নতুন ইউজার) প্রতিদিন অ্যাপ ব্যবহার করে, কিন্তু Shard 1-এর পুরনো ইউজাররা নিষ্ক্রিয়। এতে Shard 2 ওভারলোড হয়ে যাবে, কিন্তু Shard 1 বসে থাকবে।
 
 ```
 Shard 1: user_id 1     – 10,000,000
@@ -209,7 +262,11 @@ Shard 3: user_id 20M+  – 30,000,000
 **❌ অসুবিধা:** Uneven load (hotspot) হতে পারে — অনেক celebrity user একই shard-এ পড়লে সেই shard overload হবে।
 
 ### 2️⃣ Hash-Based Sharding
-Key-এর hash করে shard বেছে নেওয়া।
+সহজ ব্যাখ্যা: কোনো একটি Key (যেমন: UserId)-কে Hash Formula (যেমন: UserId % Total_Servers) দিয়ে হিসাব করে ঠিক করা ডাটা কোন সার্ভারে যাবে।
+৩টি সার্ভার থাকলে: UserId % 3
+* UserId = 101 হলে: 101 % 3 = 2 $\rightarrow$ ডাটা যাবে Server 2-এ।
+* UserId = 102 হলে: 102 % 3 = 0 $\rightarrow$ ডাটা যাবে Server 0-এ।
+বাস্তব প্রয়োগ: যখন আপনি চান ডাটা সব সার্ভারে একদম সমানভাবে বন্টন হোক, যাতে কোনো একক সার্ভারে চাপ না পড়ে।
 
 ```python
 shard_number = hash(user_id) % total_shards   # 0, 1, 2
@@ -219,7 +276,17 @@ shard_number = hash(user_id) % total_shards   # 0, 1, 2
 **❌ অসুবিধা:** Range query কষ্টসাধ্য; shard বাড়ালে (resharding) প্রায় সব ডেটা move করতে হয়।
 
 ### 3️⃣ Directory-Based Sharding
-একটা **Lookup table/service** থাকে — কোন key কোন shard-এ আছে সেটা জানায়।
+সহজ ব্যাখ্যা: মাঝে একটি Lookup Table বা Router Service থাকে, যা একটি ঠিকানার বই (Address Book)-এর মতো কাজ করে।
+
+কীভাবে কাজ করে?
+
+* অ্যাপ্লিকেশন প্রথমে Lookup Table-কে জিজ্ঞাসা করে: "User 105-এর ডাটা কোন সার্ভারে আছে?"
+
+* Lookup Table বলে: "Server 3-এ আছে।"
+
+* অ্যাপ্লিকেশন সরাসরি Server 3 থেকে ডাটা নিয়ে আসে।
+
+বাস্তব প্রয়োগ: যখন ডাটা যেকোনো সময় এক সার্ভার থেকে অন্য সার্ভারে সরানোর (Resharding) প্রয়োজন হতে পারে।
 
 ```
 lookup_table:
@@ -236,7 +303,13 @@ lookup_table:
 **❌ অসুবিধা:** Lookup service নিজেই single point of failure + extra latency।
 
 ### 4️⃣ Geographic (Geo-Based) Sharding
-Region অনুযায়ী shard — latency কমানো ও compliance-এর জন্য।
+সহজ ব্যাখ্যা: ইউজারের ভৌগোলিক অবস্থান (Country/Region) অনুযায়ী কাছের ডেটা সেন্টারের সার্ভারে ডাটা রাখা।
+
+* Dhaka Data Center: বাংলাদেশ ও এশিয়ার ইউজারদের ডাটা।
+
+* Frankfurt Data Center: ইউরোপের ইউজারদের ডাটা।
+
+বাস্তব প্রয়োগ: Latency কমানো (দ্রুত রেসপন্স দেওয়া) এবং দেশের ডাটা সুরক্ষা আইন (যেমন: GDPR) মেনে চলা।
 
 ```
 Shard EU → European users
@@ -245,6 +318,79 @@ Shard ASIA → Asian users
 ```
 
 ---
+
+### 💻 SSMS (SQL Server)-এ Sharding কীভাবে কাজ করে ও ব্যবহার হয়?
+Microsoft SQL Server (SSMS)-এ Sharding করার প্রধান দুটি পদ্ধতি রয়েছে:
+
+### পদ্ধতি ১: Application-Level Routing (সরাসরি কোড থেকে)
+SQL Server-এ Sharding বাস্তবায়নের সবচেয়ে সাধারণ ও জনপ্রিয় উপায় হলো Application Layer (.NET / Web API) থেকে পরিচালনা করা।
+
+এখানে SQL Server-এ আলাদা কোনো কাস্টম কমান্ড বা CREATE SHARD সিনট্যাক্স থাকে না। বরং একাধিক আলাদা SQL Server Instance/Database থাকে (যেমন: DB_Shard_1, DB_Shard_2) এবং C# / Web API কোড ঠিক করে কোন Connection String দিয়ে কাজ হবে।
+
+উদাহরণ (.NET / C# Logic):
+```bash 
+public string GetConnectionString(int userId)
+{
+    // Hash-Based Sharding Logic
+    int shardIndex = userId % 3; 
+
+    switch (shardIndex)
+    {
+        case 0: return "Server=SQL_Server_1;Database=DB_Shard_0;...";
+        case 1: return "Server=SQL_Server_2;Database=DB_Shard_1;...";
+        case 2: return "Server=SQL_Server_3;Database=DB_Shard_2;...";
+        default: throw new Exception("Invalid Shard");
+    }
+}
+```
+
+
+### পদ্ধতি ২: Elastic Database Tools (Azure SQL Database)
+আপনি যদি Microsoft Cloud বা Azure SQL Database ব্যবহার করেন, তবে Microsoft-এর Elastic Scale Client Library দিয়ে Sharding খুব সহজে ম্যানেজ করা যায়।
+
+* Shard Map Manager: এটি Directory-Based Sharding-এর মতো কাজ করে এবং ইন্টারনাল ম্যাপ ধরে রাখে।
+
+* Point Query Routing: ডাটা আইডি দিয়ে সরাসরি নির্দিষ্ট সার্ভারে কোয়েরি পাঠায়।
+
+* Split-Merge Tool: ডাটা এক সার্ভার থেকে আরেক সার্ভারে অনলাইন থাকা অবস্থাতেই মাইগ্রেট বা ভাগ করতে পারে।
+
+### পদ্ধতি ৩: Linked Server & Distributed Views (SSMS Native Trick)
+যদি আপনি SSMS থেকে একাধিক আলাদা সার্ভারকে একসাথে কোয়েরি করতে চান, তবে Linked Server এবং Distributed Partitioned View ব্যবহার করা হয়।
+
+Step 1: আলাদা সার্ভারে টেবিল ও Check Constraint তৈরি
+Server A (SQL_SERVER_1):
+
+```sql 
+CREATE TABLE Orders_Shard1 (
+    OrderId INT PRIMARY KEY,
+    UserId INT NOT NULL,
+    Amount DECIMAL(10,2),
+    CONSTRAINT CK_Orders_Shard1 CHECK (UserId BETWEEN 1 AND 1000000)
+);
+```
+Server B (SQL_SERVER_2):
+```sql
+CREATE TABLE Orders_Shard2 (
+    OrderId INT PRIMARY KEY,
+    UserId INT NOT NULL,
+    Amount DECIMAL(10,2),
+    CONSTRAINT CK_Orders_Shard2 CHECK (UserId BETWEEN 1000001 AND 2000000)
+);
+```
+Step 2: Main Server-এ Distributed Partitioned View তৈরি
+```sql
+-- Linked Server দিয়ে দুটি সার্ভারকে যুক্ত করার পর
+CREATE VIEW AllOrders AS
+SELECT * FROM [SQL_SERVER_1].[ShopDB].[dbo].[Orders_Shard1]
+UNION ALL
+SELECT * FROM [SQL_SERVER_2].[ShopDB].[dbo].[Orders_Shard2];
+```
+এখন আপনি যদি লিখেন:
+```sql
+SELECT * FROM AllOrders WHERE UserId = 50000;
+```
+SQL Server-এর Query Optimizer CHECK Constraint দেখে বুদ্ধিমানের মতো শুধু Server A-তে কোয়েরি পাঠাবে, Server B-তে পাঠাবেই না।
+
 
 ## 🏆 Professional Grade Implementation (Full Steps)
 
@@ -465,16 +611,6 @@ Consistent Hashing Ring:
 
 ---
 
-## 📚 References
-
-- [PostgreSQL Table Partitioning Docs](https://www.postgresql.org/docs/current/ddl-partitioning.html)
-- [MongoDB Sharding Docs](https://www.mongodb.com/docs/sharding/)
-- [Vitess Documentation](https://vitess.io/docs/)
-- [Citus (PostgreSQL Extension)](https://www.citusdata.com/)
-- Designing Data-Intensive Applications — Martin Kleppmann
-- High Scalability Blog (sharding war stories)
-
----
 
 **⭐ যদি এই গাইড কাজে লাগে, repository-তে একটা star দেবেন!**
 
