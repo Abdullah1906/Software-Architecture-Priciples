@@ -1,9 +1,5 @@
 # Chapter ১১: Caching && Read Replica
 
-> এই README-তে **Caching** এবং **Read Replica** কী, কেন, এবং কীভাবে ব্যবহার করা হয় তা
-> simple থেকে professional level পর্যন্ত step-by-step বাংলায় বোঝানো হয়েছে।
-> সব example SQL Server + SSMS + ADO.NET (.NET / C#) দিয়ে।
-
 ---
 
 ## 📌 সূচিপত্র (Table of Contents)
