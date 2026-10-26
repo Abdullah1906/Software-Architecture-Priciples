@@ -1,15 +1,11 @@
 # Chapter ১১: Caching && Read Replica
 
-> এই README-তে **Caching** এবং **Read Replica** কী, কেন, এবং কীভাবে ব্যবহার করা হয় তা
-> simple থেকে professional level পর্যন্ত step-by-step বাংলায় বোঝানো হয়েছে।
-> সব example SQL Server + SSMS + ADO.NET (.NET / C#) দিয়ে।
-
 ---
 
 ## 📌 সূচিপত্র (Table of Contents)
 
-1. [Caching কী? (Ki)](#1-caching-কী-ki)
-2. [Caching কেন লাগে? (Keno)](#2-caching-কেন-লাগে-keno)
+1. [Caching কী?](#1-caching-কী-ki)
+2. [Caching কেন লাগে?](#2-caching-কেন-লাগে-keno)
 3. [Cache-এর প্রকারভেদ](#3-cache-এর-প্রকারভেদ)
 4. [Caching Pattern](#4-caching-patterns)
 5. [Read Replica কী?](#5-read-replica-কী-ki)
