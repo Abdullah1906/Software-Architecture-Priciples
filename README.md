@@ -32,7 +32,7 @@
 |---|---|---|
 | ০৯ | CAP Theorem | [09-cap-theorem.md](09-cap-theorem.md) |
 | ১০ | Database Sharding ও Partitioning | [10-sharding-and-partitioning.md](10-sharding-and-partitioning.md) |
-| ১১ | Caching | [11-caching.md](11-caching.md) |
+| ১১ | Caching & Read Replica | [11-caching.md](11-caching.md) |
 
 ### 🔌 Part ৪: API ও Delivery
 
