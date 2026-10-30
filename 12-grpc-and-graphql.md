@@ -503,36 +503,130 @@ public sealed class Donation
 }
 ```
 
-### Step 4: Create the Query
+### Step 4: Create the Repository Layer (ADO.NET + Stored Procedure)
+প্রথমে ডাটাবেজ থেকে ডেটা আনার জন্য Repository ইন্টারফেস এবং এর ইমপ্লিমেন্টেশন তৈরি করুন। এখানে আপনার পছন্দমতো ADO.NET এবং Stored Procedure ব্যবহার করা হয়েছে।
 
-**File:** `GraphQL/DonationQuery.cs`
+File: Repositories/IDonationRepository.cs
+
+```csharp
+
+using DonationGraphQL.Api.Models;
+
+namespace DonationGraphQL.Api.Repositories;
+
+public interface IDonationRepository
+{
+    Task<IEnumerable<Donation>> GetAllAsync();
+}
+```
+
+File: Repositories/DonationRepository.cs
+
+```csharp
+using System.Data;
+using Microsoft.Data.SqlClient;
+using DonationGraphQL.Api.Models;
+
+namespace DonationGraphQL.Api.Repositories;
+
+public sealed class DonationRepository : IDonationRepository
+{
+    private readonly string _connectionString;
+
+    public DonationRepository(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    }
+
+    public async Task<IEnumerable<Donation>> GetAllAsync()
+    {
+        var donations = new List<Donation>();
+
+        using var connection = new SqlConnection(_connectionString);
+        using var command = new SqlCommand("sp_GetDonations", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            donations.Add(new Donation
+            {
+                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                Status = reader.GetString(reader.GetOrdinal("Status"))
+            });
+        }
+
+        return donations;
+    }
+}
+```
+
+### Step 5: Create the Application Service Layer
+রিপোজিটরি থেকে ডেটা নিয়ে বিজনেস লজিক বা প্রসেসিং করার জন্য Service লেয়ার তৈরি করুন।
+
+File: Services/IDonationService.cs
 
 ```csharp
 using DonationGraphQL.Api.Models;
+
+namespace DonationGraphQL.Api.Services;
+
+public interface IDonationService
+{
+    Task<IEnumerable<Donation>> GetDonationsAsync();
+}
+
+```
+File: Services/DonationService.cs
+
+
+```csharp
+using DonationGraphQL.Api.Models;
+using DonationGraphQL.Api.Repositories;
+
+namespace DonationGraphQL.Api.Services;
+
+public sealed class DonationService : IDonationService
+{
+    private readonly IDonationRepository _donationRepository;
+
+    public DonationService(IDonationRepository donationRepository)
+    {
+        _donationRepository = donationRepository;
+    }
+
+    public async Task<IEnumerable<Donation>> GetDonationsAsync()
+    {
+        // এখানে চাইলে কোনো রুল বা ফিল্টারিং লজিক যোগ করতে পারেন
+        return await _donationRepository.GetAllAsync();
+    }
+}
+```
+
+### Step 6: Update the GraphQL Query
+এখন DonationQuery-তে সরাসরি static ডেটা না রেখে IDonationService ইনজেক্ট করুন এবং অ্যাসিনক্রোনাসলি (ResolveAsync) ডেটা ফেচ করুন।
+
+File: GraphQL/DonationQuery.cs
+
+```csharp
+using DonationGraphQL.Api.Models;
+using DonationGraphQL.Api.Services;
 using GraphQL.Types;
 
 namespace DonationGraphQL.Api.GraphQL;
 
 public sealed class DonationQuery : ObjectGraphType
 {
-    public DonationQuery()
+    public DonationQuery(IDonationService donationService)
     {
         Field<ListGraphType<DonationType>>("donations")
-            .Resolve(_ => new List<Donation>
-            {
-                new()
-                {
-                    Id = 1,
-                    Amount = 5000,
-                    Status = "Completed"
-                },
-                new()
-                {
-                    Id = 2,
-                    Amount = 2500,
-                    Status = "Pending"
-                }
-            });
+            .ResolveAsync(async context => await donationService.GetDonationsAsync());
     }
 }
 
@@ -547,42 +641,27 @@ public sealed class DonationType : ObjectGraphType<Donation>
 }
 ```
 
-এই উদাহরণে static sample data ব্যবহার করা হয়েছে, যাতে GraphQL query এবং type-এর কাজ সহজে বোঝা যায়। এটি production database implementation নয়।
 
-### Step 5: Register the GraphQL Schema
-
-**File:** `GraphQL/DonationSchema.cs`
-
-```csharp
-using GraphQL.Types;
-
-namespace DonationGraphQL.Api.GraphQL;
-
-public sealed class DonationSchema : Schema
-{
-    public DonationSchema(IServiceProvider provider)
-        : base(provider)
-    {
-        Query = provider.GetRequiredService<DonationQuery>();
-    }
-}
-```
-
-### Step 6: Configure Program.cs
+### Step 7: Configure Program.cs
 
 **File:** `Program.cs`
 
 ```csharp
 using DonationGraphQL.Api.GraphQL;
+using DonationGraphQL.Api.Repositories;
+using DonationGraphQL.Api.Services;
 using GraphQL;
 using GraphQL.Types;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 1. Register Data Access & Services
+builder.Services.AddScoped<IDonationRepository, DonationRepository>();
+builder.Services.AddScoped<IDonationService, DonationService>();
+
+// 2. Register GraphQL Types & Schema
 builder.Services.AddSingleton<DonationQuery>();
-
 builder.Services.AddSingleton<ISchema, DonationSchema>();
-
 builder.Services.AddGraphQL(options =>
     options.AddSystemTextJson());
 
@@ -590,15 +669,14 @@ var app = builder.Build();
 
 app.UseGraphQL<ISchema>("/graphql");
 
-app.MapGet("/", () =>
-    "Donation GraphQL API is running.");
+app.MapGet("/", () => "Donation GraphQL API is running with Service/Repository layer.");
 
 app.Run();
 ```
 
 GraphQL.NET-এর package version অনুযায়ী middleware ও DI configuration-এ সামান্য পার্থক্য থাকতে পারে। Build error হলে installed version-এর official guide অনুসরণ করবে।
 
-### Step 7: Send a GraphQL Query
+### Step 8: Send a GraphQL Query
 
 GraphQL endpoint:
 
