@@ -20,7 +20,6 @@
 - [14. Common Mistakes](#14-common-mistakes)
 - [15. Learning Roadmap](#15-learning-roadmap)
 - [16. Interview Questions](#16-interview-questions)
-- [17. Official Resources](#17-official-resources)
 
 ---
 
