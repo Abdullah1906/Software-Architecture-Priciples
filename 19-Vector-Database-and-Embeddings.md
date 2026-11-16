@@ -1066,20 +1066,6 @@ Keyword Search এবং Vector Search একসঙ্গে ব্যবহা�
 
 প্রাথমিক Search Result-গুলোকে আরও উন্নত Relevance Model দিয়ে পুনরায় Score এবং Rank করা।
 
-## 17. Official Resources
-
-1. [Microsoft Learn — Vector Databases for .NET AI Apps](https://learn.microsoft.com/en-us/dotnet/ai/conceptual/vector-databases)
-2. [Microsoft Learn — Build a .NET Vector Search App](https://learn.microsoft.com/en-us/dotnet/ai/vector-stores/how-to/build-vector-search-app)
-3. [Microsoft Learn — Embeddings in .NET](https://learn.microsoft.com/en-us/dotnet/ai/conceptual/embeddings)
-4. [OpenAI — Retrieval Guide](https://platform.openai.com/docs/guides/retrieval)
-5. [Qdrant Documentation](https://qdrant.tech/documentation/)
-6. [Qdrant .NET Client](https://github.com/qdrant/qdrant-dotnet)
-7. [Pinecone Documentation](https://docs.pinecone.io/)
-8. [Weaviate Documentation](https://docs.weaviate.io/)
-9. [Milvus Documentation](https://milvus.io/docs)
-10. [pgvector GitHub](https://github.com/pgvector/pgvector)
-
----
 
 ## Final Summary
 
