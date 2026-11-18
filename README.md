@@ -48,6 +48,9 @@
 | ১৪ | HTTPS ও TLS | [14-https-and-tls.md](14-https-and-tls.md) |
 | ১৫ | JWT ও OAuth 2.0 | [15-jwt-and-oauth2.md](15-jwt-and-oauth2.md) |
 | ১৬ | SQL Injection ও XSS Protection | [16-sql-injection-and-xss.md](16-sql-injection-and-xss.md) |
+| ১৭ | CORS (Cross-Origin Resource Sharing) | [17-CORS.md](17-CORS.md) |
+| ১৮ | Idempotency ও Concurrency Control | [18-Idempotency & Concurrency.md](18-Idempotency & Concurrency.md) |
+| ১৯ | Vector Database ও Embeddings | [19-Vector-Database-and-Embeddings.md](19-Vector-Database-and-Embeddings.md) |
 
 ---
 
